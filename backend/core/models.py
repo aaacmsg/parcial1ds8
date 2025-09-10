@@ -25,7 +25,7 @@ class CarEvent(models.Model):
     timestamp = models.DateTimeField(default=timezone.now)
 
     spot = models.ForeignKey(ParkingSpot, on_delete=models.SET_NULL, null=True, blank=True)
-    occupied_spot_number = model.PositiveIntegerField(null=True, blank=True)
+    occupied_spot_number = models.PositiveIntegerField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
         self.occupied_spot_number = self.spot.number if self.spot else None
