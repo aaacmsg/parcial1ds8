@@ -3,6 +3,7 @@ from core.models import ParkingSpot, CarEvent
 from typing import List, Optional
 from django.db import transaction
 from django.utils import timezone
+from django.db.models.functions import Extract
 from django.db.models import Q, F, Min, ExpressionWrapper, Sum, DurationField, FloatField
 import random, string, datetime
 
@@ -93,7 +94,7 @@ def get_total_cash() -> float:
         )
         .annotate(
             seconds=ExpressionWrapper(
-                F('duration').total_seconds(),  # converts timedelta to seconds
+                        Extract(F('duration'), 'epoch'),  # converts timedelta to seconds
                 output_field=FloatField()
             ),
             cost=ExpressionWrapper(
@@ -131,11 +132,11 @@ def get_state_payload() -> StateOut:
     # latest status per car
     latest_ids = (
         CarEvent.objects
-        .order_by('car_uuid', '-timestamp', '-id')
+        .order_by('car_uuid', '-timestamp')
         .distinct('car_uuid')
-        .values_list('id', flat=True)
+        .values_list('car_uuid', flat=True)
     )
-    latest = CarEvent.objects.filter(id__in=latest_ids)
+    latest = CarEvent.objects.filter(car_uuid__in=latest_ids)
 
     entering = [
         CarEventOut(
@@ -183,13 +184,13 @@ def get_state_payload() -> StateOut:
     sessions = []
     left_latest_ids = (
         CarEvent.objects.filter(status=CarEvent.Status.HAS_LEFT)
-        .order_by('car_uuid', '-timestamp', '-id')
+        .order_by('car_uuid', '-timestamp')
         .distinct('car_uuid')
         .values_list('car_uuid', flat=True)
     )
     for cid in left_latest_ids:
-        start = CarEvent.objects.filter(car_uuid=cid, status=CarEvent.Status.ENTERING).order_by('timestamp', '-id').first()
-        end = CarEvent.objects.filter(car_uuid=cid, status=CarEvent.Status.HAS_LEFT).order_by('-timestamp', '-id').first()
+        start = CarEvent.objects.filter(car_uuid=cid, status=CarEvent.Status.ENTERING).order_by('timestamp', '-car_uuid').first()
+        end = CarEvent.objects.filter(car_uuid=cid, status=CarEvent.Status.HAS_LEFT).order_by('-timestamp', '-car_uuid').first()
         if not start or not end:
             continue
         seconds = int((end.timestamp - start.timestamp).total_seconds())
@@ -228,7 +229,7 @@ def resolve_previous_cycle():
     now = timezone.now()
     free_spots = list(ParkingSpot.objects.filter(is_occupied=False).order_by('number'))
     entering_latest = list(CarEvent.objects.raw(
-        """SELECT DISTINCT ON (car_uuid) * FROM core_carevent WHERE status = %s ORDER BY car_uuid, timestamp DESC, id DESC""",
+        """SELECT DISTINCT ON (car_uuid) * FROM core_carevent WHERE status = %s ORDER BY car_uuid DESC, timestamp DESC""",
         [CarEvent.Status.ENTERING]
     ))
     for e in entering_latest:
@@ -258,7 +259,7 @@ def resolve_previous_cycle():
         )
 
     leaving_latest = list(CarEvent.objects.raw(
-        """SELECT DISTINCT ON (car_uuid) * FROM core_carevent WHERE status = %s ORDER BY car_uuid, timestamp DESC, id DESC""",
+        """SELECT DISTINCT ON (car_uuid) * FROM core_carevent WHERE status = %s ORDER BY car_uuid DESC, timestamp DESC""",
         [CarEvent.Status.LEAVING]
     ))
     for e in leaving_latest:
@@ -276,6 +277,7 @@ def resolve_previous_cycle():
 
 # API Endpoints
 @api.post("/cycle")
+
 def cycle(request):
     resolve_previous_cycle()
 
@@ -284,11 +286,11 @@ def cycle(request):
 
     parked_ids = (
         CarEvent.objects.filter(status=CarEvent.Status.PARKED)
-        .order_by('car_uuid', '-timestamp', '-id')
+        .order_by('car_uuid', '-timestamp')
         .distinct('car_uuid')
-        .values_list('id', flat=True)
+        .values_list('car_uuid', flat=True)
     )
-    parked_latest = list(CarEvent.objects.filter(id__in=parked_ids))
+    parked_latest = list(CarEvent.objects.filter(car_uuid__in=parked_ids))
     leaving_count = random.randint(1, min(3, len(parked_latest))) if roll == 1 else 0
 
     now = timezone.now()
@@ -296,7 +298,6 @@ def cycle(request):
     for _ in range(entering_count):
         fields = random_car_fields()
         CarEvent.objects.create(
-            car_uuid=None,
             status=CarEvent.Status.ENTERING,
             timestamp=now,
             **fields
@@ -318,7 +319,6 @@ def cycle(request):
 @api.post("/cars/enter", response=CarEventOut)
 def manual_enter(request, payload: EnterCarIn):
     e = CarEvent.objects.create(
-        car_uuid=None,
         license_plate=payload.license_plate,
         model=payload.model or "",
         color=payload.color or "",

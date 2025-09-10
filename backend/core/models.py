@@ -7,7 +7,7 @@ class ParkingSpot(models.Model):
     is_occupied = models.BooleanField(default=False)
 
     def __str__(self):
-        return f"Spot {self.spot_number} - {'occupied' if self.is_occupied else 'free'}"
+        return f"Spot {self.number} - {'occupied' if self.is_occupied else 'free'}"
     
 class CarEvent(models.Model):
     class Status(models.TextChoices):
