@@ -119,18 +119,18 @@ def get_state_payload() -> StateOut:
 
     latest = list(CarEvent.objects.filter(id__in=latest_ids))
 
-    entering = [CarEventOut(
-        car_uuid=str(e.car_uuid),license_plate=e.license_plate,,model=e.model,color=e.color,
+    entering = [CarEventOut( 
+        car_uuid=str(e.car_uuid),license_plate=e.license_plate,model=e.model,color=e.color,
         year=e.year,status=e.status,timestamp=e.timestamp, occupied_spot_number=e.occupied_spot_number
     ) for e in latest if e.status == CarEvent.Status.ENTERING]
 
     parked = [CarEventOut(
-        car_uuid=str(e.car_uuid),license_plate=e.license_plate,,model=e.model,color=e.color,
+        car_uuid=str(e.car_uuid),license_plate=e.license_plate,model=e.model,color=e.color,
         year=e.year,status=e.status,timestamp=e.timestamp, occupied_spot_number=e.occupied_spot_number
     ) for e in latest if e.status == CarEvent.Status.PARKED]
 
     leaving = [CarEventOut(
-        car_uuid=str(e.car_uuid),license_plate=e.license_plate,,model=e.model,color=e.color,
+        car_uuid=str(e.car_uuid),license_plate=e.license_plate,model=e.model,color=e.color,
         year=e.year,status=e.status,timestamp=e.timestamp, occupied_spot_number=e.occupied_spot_number
     ) for e in latest if e.status == CarEvent.Status.LEAVING]
 
